@@ -1,0 +1,225 @@
+@SET RESTART						FALSE
+@SET DO_RESTART						NO
+@SET BASIS_FILE 					BASIS_MOLOPT
+@SET PSEUDOFILE 					GTH_POTENTIALS
+@SET WAVEFILE						wave_file_name
+
+
+!parameters for GLOBAL section
+@SET SYSNAME						NA-5M-4V
+@SET RTYPE						MD			
+
+
+!parameters for FORCE_EVAL section
+@SET CUTOFF						300
+@SET GRIDS						5
+@SET SCF_NCYCLES					30
+@SET SCF_OCYCLES					10
+@SET SCF_CONV						1E-5
+@IF (${RESTART} == TRUE)
+	@SET SCF_GUESS					RESTART
+@ENDIF
+@IF (${RESTART} == FALSE)
+	@SET SCF_GUESS					ATOMIC
+@ENDIF
+
+!minimizer algorithm for SCF: BROYDEN, CG OR DIIS
+@SET SCF_MINI 						DIIS
+@SET FUNCTIONAL						PBE
+
+!parameters for MOTION section
+@SET MD_ENS						NVT
+@SET MD_STEPS						15000
+@SET MD_DT						1.0     !integration time step (in fs)
+@SET MD_TEMP						350
+
+@SET OUT_FORM						XYZ
+@SET OUT_UNIT						angstrom
+
+&GLOBAL
+	PROJECT 					${SYSNAME}
+	RUN_TYPE					${RTYPE}
+	PRINT_LEVEL					LOW
+ 	EXTENDED_FFT_LENGTHS				T
+!	ELPA_KERNEL					NVIDIA_GPU
+!	PREFERRED_CHOLESKY_LIBRARY 			DLAF 	
+&END GLOBAL
+
+&FORCE_EVAL
+	!print the forces
+	&PRINT
+		&FORCES
+		&END
+	&END
+
+	METHOD QUICKSTEP
+	&DFT
+		BASIS_SET_FILE_NAME			${BASIS_FILE}
+		POTENTIAL_FILE_NAME			${PSEUDOFILE}
+		
+		@IF (@RESTART == TRUE)
+			WFN_RESTART_FILE_NAME 	${WAVEFILE}
+		@ENDIF
+
+		&MGRID
+			CUTOFF				${CUTOFF}
+			NGRIDS				${GRIDS}
+		&END MGRID
+
+		!settings for quickstep
+		&QS
+			METHOD 				GPW
+			!EPS_DEFAULT			1.0e-10 		!using the default value
+			!MAP_CONSISTENT			TRUE
+			EXTRAPOLATION			ASPC
+			EXTRAPOLATION_ORDER		3
+		&END QS
+
+&SCF
+    MAX_SCF                         ${SCF_NCYCLES}
+    EPS_SCF                         ${SCF_CONV}
+    SCF_GUESS                       ${SCF_GUESS}
+    IGNORE_CONVERGENCE_FAILURE	    T
+    
+    &OT ON
+        PRECONDITIONER			    FULL_SINGLE_INVERSE
+        MINIMIZER                   ${SCF_MINI}
+        N_DIIS                      7
+    &END OT
+
+    &OUTER_SCF
+        MAX_SCF                     ${SCF_OCYCLES}
+        EPS_SCF                     ${SCF_CONV}
+    &END OUTER_SCF
+
+    &PRINT
+        &RESTART
+        	LOG_PRINT_KEY			T
+        	&EACH
+        		QS_SCF				0
+        		MD					20
+        	&END EACH
+        	ADD_LAST				NUMERIC
+        &END RESTART
+    &END PRINT
+
+&END SCF
+
+
+		!exchange correlation calculation
+		&XC
+			&XC_FUNCTIONAL 			${FUNCTIONAL}
+			&END 				XC_FUNCTIONAL
+		        &vdW_POTENTIAL
+           			DISPERSION_FUNCTIONAL PAIR_POTENTIAL
+           			&PAIR_POTENTIAL
+	     				PARAMETER_FILE_NAME dftd3.dat
+              				TYPE DFTD3
+	      				REFERENCE_FUNCTIONAL PBE
+              				R_CUTOFF  [angstrom] 16
+           			&END PAIR_POTENTIAL
+        		&END vdW_POTENTIAL
+		&END XC
+		
+       			       			
+   	  &PRINT
+   	     		&V_HARTREE_CUBE
+   	     			STRIDE  1 1 1
+         			FILENAME V_hartreeee
+      				&EACH
+         				MD 				100
+      				&END
+      				ADD_LAST NUMERIC
+   	    		&END  V_HARTREE_CUBE
+   	   
+	       		&E_DENSITY_CUBE
+         			DENSITY_INCLUDE	TOTAL_HARD_APPROX
+         			STRIDE 1 1 1
+         			FILENAME total_densityyy
+      				&EACH
+         				MD 				50
+      				&END
+      				ADD_LAST NUMERIC
+       			&END E_DENSITY_CUBE
+   	 
+   	 		&HIRSHFELD
+   				SHAPE_FUNCTION  DENSITY
+         			FILENAME Hirshfeld
+      				&EACH
+         				MD 				50
+      				&END
+      				ADD_LAST NUMERIC
+   			&END HIRSHFELD
+   	 &END PRINT       			
+
+	&END DFT
+
+	@INCLUDE 'subsys.inc'
+
+&END FORCE_EVAL
+
+&MOTION
+	&MD
+		ENSEMBLE				${MD_ENS}
+		STEPS					${MD_STEPS}
+		TIMESTEP				${MD_DT}
+		TEMPERATURE				${MD_TEMP}
+		TEMP_TOL				100
+		ANGVEL_ZERO					
+		COMVEL_TOL				2.0E-4
+
+		@IF (${MD_ENS} == NVT)
+		&THERMOSTAT
+			TYPE 				CSVR
+			REGION				GLOBAL
+			&CSVR
+				TIMECON			100
+			&END CSVR
+		&END THERMOSTAT
+
+		&PRINT
+      		&ENERGY
+        		&EACH
+           			MD 			1
+        		&END
+      		&END
+
+      		&PROGRAM_RUN_INFO
+        		&EACH
+           			MD 			100
+        		&END
+      		&END
+      		FORCE_LAST
+    	&END PRINT
+	&END MD
+	
+	!fixed Left electrode atoms
+	&CONSTRAINT
+    		&FIXED_ATOMS
+      			LIST 1..48
+    		&END FIXED_ATOMS
+  	&END CONSTRAINT		
+	
+	!print settings
+	&PRINT
+    	&TRAJECTORY
+      		&EACH
+        		MD 				1
+      		&END
+    	&END
+    	&VELOCITIES OFF
+    	&END
+    	&RESTART
+      		&EACH
+         		MD 				100
+      		&END
+      		ADD_LAST 			NUMERIC
+    	&END
+    	&RESTART_HISTORY 
+      		&EACH
+         		MD 				100
+      		&END
+    	&END
+  &END PRINT
+
+&END MOTION
