@@ -42,22 +42,22 @@ force-field type assignments are organized as follows.
 
   Bond Type   Species
   ----------- ---------
-  1--3        FSI⁻
-  4--18       DME
+  - 1--3        FSI⁻
+  - 4--18       DME
 
 ### Angle Coefficients
 
   Angle Type   Species
   ------------ ---------
-  1--5         FSI⁻
-  6--31        DME
+  - 1--5         FSI⁻
+  - 6--31        DME
 
 ### Dihedral Coefficients
 
   Dihedral Type   Species
   --------------- ---------
-  1--2            FSI⁻
-  3--23           DME
+  - 1--2            FSI⁻
+  - 3--23           DME
 
 ## Notes
 
