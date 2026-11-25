@@ -33,10 +33,10 @@ force-field type assignments are organized as follows.
 
   Type ID   Species
   --------- --------------------------------------------
-  1         Na⁺ ion
-  2--5      FSI⁻
-  6--21     DME
-  22        Metallic Na electrode, \[110\] orientation
+  - 1         Na⁺ ion
+  - 2--5      FSI⁻
+  - 6--21     DME
+  - 22        Metallic Na electrode, \[110\] orientation
 
 ### Bond Coefficients
 
